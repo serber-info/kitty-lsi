@@ -26,16 +26,6 @@ Illustrative examples of grid and long-listing views:
 
 ![lli long-listing example](assets/lli_demo.png)
 
-### Actual Kitty captures
-
-The following captures use generated test fixtures in a real Kitty window:
-
-![Thumbnail grid in a real Kitty window](docs/images/grid.png)
-
-![Long listing in a real Kitty window](docs/images/long.png)
-
-![Extension icons in a real Kitty window](docs/images/extension-icons.png)
-
 ## Run the local standalone binary
 
 ```sh
@@ -160,9 +150,6 @@ See [Rust build/test instructions](rust/README.md),
 [contribution guidelines](CONTRIBUTING.md),
 [Linux distribution instructions](docs/distribution.md), and
 [security policy and runtime limits](SECURITY.md).
-
-The [Python reference](docs/python-reference.md) remains available, but Python
-installation is **not** the recommended end-user distribution path.
 
 ## License
 
