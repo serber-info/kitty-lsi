@@ -18,11 +18,9 @@ The implementation is **Rust**, in [`rust/`](rust/README.md).
 
 ## Visual examples
 
-Illustrative examples of grid and long-listing views:
+Example of the grid view:
 
 ![lsi grid example](assets/lsi_demo.png)
-
-![lli long-listing example](assets/lli_demo.png)
 
 ## Run the local standalone binary
 
