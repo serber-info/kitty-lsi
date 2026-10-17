@@ -1,0 +1,144 @@
+name: tests-and-candidate-artifacts
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: 1.98.0
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.13'
+      - name: Build-only NASM without privileged installation
+        run: |
+          mkdir "$RUNNER_TEMP/nasm"
+          cd "$RUNNER_TEMP/nasm"
+          apt-get download nasm bubblewrap
+          for package in ./*.deb; do dpkg-deb -x "$package" extracted; done
+          echo "$RUNNER_TEMP/nasm/extracted/usr/bin" >> "$GITHUB_PATH"
+      - run: rustup toolchain install 1.98.0 --profile minimal --component clippy,rustfmt --target x86_64-unknown-linux-musl
+      - working-directory: rust
+        run: |
+          cargo +1.98.0 fmt --check
+          cargo +1.98.0 test --locked
+          cargo +1.98.0 clippy --locked --all-targets -- -D warnings
+          sh ../tools/build_static.sh
+      - name: Dependency and license policy
+        working-directory: rust
+        run: |
+          cargo +1.98.0 install cargo-audit --version 0.22.2 --locked --root "$RUNNER_TEMP/audit"
+          cargo +1.98.0 install cargo-deny --version 0.20.2 --locked --root "$RUNNER_TEMP/deny"
+          "$RUNNER_TEMP/audit/bin/cargo-audit" audit
+          "$RUNNER_TEMP/deny/bin/cargo-deny" --locked check
+      - run: python -m pip install -e .
+      - run: python -B -m unittest discover -s tests -v
+      - name: Rust compatibility in isolated processes
+        run: python -B -m unittest discover -s rust/tests -p test_compatibility.py -v
+        env:
+          LSI_BINARY: ${{ github.workspace }}/tools/isolate_binary.py
+      - name: Isolated functional and adversarial CLI checks
+        run: python tools/security_tests.py --binary rust/target/x86_64-unknown-linux-musl/release/lsi --out "$RUNNER_TEMP/security-results"
+      - name: Verify Python reference unchanged
+        run: sha256sum -c docs/python-baseline.sha256
+      - name: ELF gates (fail closed)
+        run: |
+          python -B -m unittest discover -s tools -p test_release.py -v
+          python tools/check_elf.py rust/target/x86_64-unknown-linux-musl/release/lsi
+          if python tools/check_elf.py LICENSE; then exit 1; fi
+      - name: Build candidate packages, licenses and provenance
+        run: |
+          python tools/build_release.py --binary rust/target/x86_64-unknown-linux-musl/release/lsi --out "$RUNNER_TEMP/packages" --repository "$GITHUB_REPOSITORY" --revision "$GITHUB_SHA" --maintainer 'serber-info <39016027+serber-info@users.noreply.github.com>' --epoch "$(git show -s --format=%ct HEAD)"
+          cd "$RUNNER_TEMP/packages"
+          sha256sum -c SHA256SUMS
+          dpkg-deb --info ./*.deb
+          dpkg-deb --contents ./*.deb
+      # Intentionally no release/upload/publish permission or publication step.
+      # Isolated security and clean distro package tests must pass before any
+      # separately authorized release workflow.
+      - name: Retain candidate artifacts, not a public release
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: linux-x86_64-candidate
+          path: ${{ runner.temp }}/packages
+          retention-days: 14
+      - name: Retain security results including failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: security-results
+          path: ${{ runner.temp }}/security-results
+          if-no-files-found: ignore
+          retention-days: 7
+  deb-packages:
+    needs: verify
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        distro: [ubuntu, debian]
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: linux-x86_64-candidate
+          path: packages
+      - run: cd packages && sha256sum -c SHA256SUMS
+      - name: Unprivileged namespace tool
+        run: |
+          mkdir "$RUNNER_TEMP/bwrap"
+          cd "$RUNNER_TEMP/bwrap"
+          apt-get download bubblewrap
+          dpkg-deb -x ./*.deb extracted
+          echo "$RUNNER_TEMP/bwrap/extracted/usr/bin" >> "$GITHUB_PATH"
+      - run: python tools/test_deb.py --distro '${{ matrix.distro }}' --package packages/lsi_*_amd64.deb --out "$RUNNER_TEMP/package-test"
+  arch-package:
+    needs: verify
+    runs-on: ubuntu-24.04
+    container:
+      image: archlinux:base-devel@sha256:061679925e5d5028f2df9395d441ce6c4b9accf0157ff3486c06b6962e014ef1
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: linux-x86_64-candidate
+          path: packages
+      - name: Validate packages in disposable Arch container, never host
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd packages
+          sha256sum -c SHA256SUMS
+          cd ..
+          useradd --create-home builder
+          mkdir "$RUNNER_TEMP/aur"
+          cp packaging/aur/PKGBUILD.in "$RUNNER_TEMP/aur/PKGBUILD"
+          archive=$(realpath packages/lsi-*-linux-x86_64.tar.gz)
+          checksum=$(sha256sum "$archive" | cut -d' ' -f1)
+          version=$(basename "$archive" | sed 's/^lsi-//;s/-linux-x86_64.tar.gz$//')
+          sed -i "s/@VERSION@/$version/g;s|@REPOSITORY@|LOCAL-VALIDATION/NOT-PUBLISHED|g;s/@SHA256@/$checksum/g" "$RUNNER_TEMP/aur/PKGBUILD"
+          sed -i 's|https://github.com/LOCAL-VALIDATION/NOT-PUBLISHED/releases/download/v${pkgver}/lsi-${pkgver}-linux-x86_64.tar.gz|lsi-${pkgver}-linux-x86_64.tar.gz|' "$RUNNER_TEMP/aur/PKGBUILD"
+          cp "$archive" "$RUNNER_TEMP/aur/"
+          chown -R builder:builder "$RUNNER_TEMP/aur"
+          cd "$RUNNER_TEMP/aur"
+          su builder -c 'makepkg --printsrcinfo > .SRCINFO && makepkg --nodeps --nocheck --nosign'
+          pacman -U --noconfirm ./lsi-bin-*.pkg.tar.zst
+          lsi --version
+          lli -lh PKGBUILD
+          pacman -Qkk lsi-bin
+          pacman -R --noconfirm lsi-bin
+          test ! -e /usr/bin/lsi
+          test ! -e /usr/bin/lli

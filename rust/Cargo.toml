@@ -1,0 +1,32 @@
+[package]
+name = "kitty-lsi"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.98"
+license = "MIT"
+description = "An ls with real image thumbnails inside Kitty, as a standalone Linux executable"
+publish = false
+
+[[bin]]
+name = "lsi"
+path = "src/main.rs"
+
+[dependencies]
+base64 = "0.22.1"
+chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
+clap = { version = "4.5", features = ["derive"] }
+getrandom = "0.3.4"
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp", "tiff", "ico"] }
+avif-decode = { version = "3.0.0", default-features = false }
+avif-parse = "2.1.0"
+libc = "0.2"
+unicode-width = "0.2"
+unicode-general-category = "1"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+
+[lints.clippy]
+undocumented_unsafe_blocks = "deny"

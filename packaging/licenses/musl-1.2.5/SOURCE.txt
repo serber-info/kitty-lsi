@@ -1,0 +1,6 @@
+Copyright source: https://git.musl-libc.org/cgit/musl/plain/COPYRIGHT?h=v1.2.5
+Rust 1.98.0 (88d9e12ae178fab0fb5cc050a94da85685d449ea) builds this musl
+version with vendor patches for CVE-2026-6042 and CVE-2026-40200 according to:
+https://github.com/rust-lang/rust/blob/88d9e12ae178fab0fb5cc050a94da85685d449ea/src/ci/docker/scripts/musl-toolchain.sh
+This is build-source evidence, not a comprehensive audit of native runtime code.
+RustSec only audits crate advisories; it does not replace native runtime review.

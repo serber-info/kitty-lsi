@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.env
+.env.*
+.ruff_cache/
+/rust/target/
+/artifacts/
+# Unverified, unused local mockups; public screenshots live in docs/images/.
+/assets/*_demo.png

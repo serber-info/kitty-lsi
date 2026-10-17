@@ -1,0 +1,20 @@
+targets = [{ triple = "x86_64-unknown-linux-musl" }]
+
+# Reviewed runtime/build license policy. No vulnerability advisories are ignored.
+[advisories]
+# Build-only proc macro; no known runtime vulnerability. Recheck before every
+# release and by 2026-11-17. See SECURITY.md for rationale and removal criteria.
+ignore = ["RUSTSEC-2024-0436"]
+
+[licenses]
+confidence-threshold = 0.8
+allow = ["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "MPL-2.0", "Unicode-3.0", "Zlib", "0BSD", "CC0-1.0", "Unlicense"]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

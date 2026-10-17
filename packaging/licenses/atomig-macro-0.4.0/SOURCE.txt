@@ -1,0 +1,5 @@
+atomig-macro 0.4.0 omits workspace license texts from its crates.io archive.
+License texts retrieved from the exact .cargo_vcs_info.json commit:
+https://github.com/LukasKalbertodt/atomig/tree/abd42e50a6a1b0615505189a780fcb5da19d7385
+Files: LICENSE-MIT and LICENSE-APACHE at repository root.
+Declared SPDX: MIT OR Apache-2.0.

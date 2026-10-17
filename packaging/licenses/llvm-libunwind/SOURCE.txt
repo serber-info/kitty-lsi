@@ -1,0 +1,5 @@
+Rust 1.98.0 source LLVM commit, identified by its installed COPYRIGHT.html:
+7738295178045041669876bf32b0543ec8319a5c
+License source:
+https://github.com/rust-lang/llvm-project/blob/7738295178045041669876bf32b0543ec8319a5c/libunwind/LICENSE.TXT
+LLVM runtime license: Apache-2.0 WITH LLVM-exception AND NCSA.

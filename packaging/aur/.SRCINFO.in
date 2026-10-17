@@ -1,0 +1,27 @@
+pkgbase = lsi-bin
+	pkgdesc = Image thumbnail listing in Kitty-compatible terminals (standalone binary)
+	pkgver = @VERSION@
+	pkgrel = 1
+	url = https://github.com/@REPOSITORY@
+	arch = x86_64
+	license = MIT
+	license = Apache-2.0
+	license = BSD-2-Clause
+	license = BSD-3-Clause
+	license = MPL-2.0
+	license = Unicode-3.0
+	license = Zlib
+	license = 0BSD
+	license = CC0-1.0
+	license = Unlicense
+	license = ISC
+	license = NCSA
+	license = Apache-2.0 WITH LLVM-exception
+	provides = lsi=@VERSION@
+	conflicts = lsi
+	options = !strip
+	options = !debug
+	source = https://github.com/@REPOSITORY@/releases/download/v@VERSION@/lsi-@VERSION@-linux-x86_64.tar.gz
+	sha256sums = @SHA256@
+
+pkgname = lsi-bin
