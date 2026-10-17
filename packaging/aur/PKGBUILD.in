@@ -13,7 +13,6 @@ source=("https://github.com/@REPOSITORY@/releases/download/v${pkgver}/lsi-${pkgv
 sha256sums=('@SHA256@')
 package() {
   install -Dm755 lsi "$pkgdir/usr/bin/lsi"
-  ln -s lsi "$pkgdir/usr/bin/lli"
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
   install -Dm644 README.md "$pkgdir/usr/share/doc/lsi/README.md"
   install -Dm644 SECURITY.md "$pkgdir/usr/share/doc/lsi/SECURITY.md"

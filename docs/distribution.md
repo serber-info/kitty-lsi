@@ -19,7 +19,7 @@ before parsing results and generates:
 
 - `lsi-VERSION-linux-x86_64.tar.gz`: `lsi`, relative `lli -> lsi`, documentation,
   dependency license texts, exact MPL source, dependency inventory, provenance.
-- `lsi_VERSION_amd64.deb`: the same executable/alias in `/usr/bin`, documentation
+- `lsi_VERSION_amd64.deb`: the executable in `/usr/bin/lsi`, documentation
   and license/source material in `/usr/share/doc/lsi`; no maintainer scripts,
   no declared Python/Rust/Cargo/converter runtime dependencies.
 - SHA-256 sums and provenance. Archives use normalized owner, mode, timestamps
@@ -122,3 +122,9 @@ The workflow has been reviewed locally but has **not run on GitHub**. Before a
 release: run it on the approved source commit, validate real metadata and package
 names, review secrets/unwanted files and hashes, and obtain explicit publication
 authorization. Do not describe a local test as a successful hosted CI run.
+
+## Optional short alias
+
+Packages do not install `/usr/bin/lli`, which can belong to LLVM. Define
+`alias lli='lsi -l'` in your own Bash/Zsh session/profile if wanted. The standalone
+archive retains its relative `lli -> lsi` shortcut: still one executable.

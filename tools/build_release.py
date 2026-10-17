@@ -297,13 +297,15 @@ def main():
     archive.write_bytes(tar_bytes(common, a.epoch))
     debfiles = []
     for name, data, mode, link in common:
+        if name == "lli":
+            continue  # Global lli belongs to LLVM; packages install lsi only.
         target = (
             "usr/bin/" + name
             if name in {"lsi", "lli"}
             else "usr/share/doc/lsi/" + ("copyright" if name == "LICENSE" else name)
         )
         debfiles.append((target, data, mode, link))
-    control = f"Package: lsi\nVersion: {version}\nSection: utils\nPriority: optional\nArchitecture: amd64\nMaintainer: {a.maintainer or 'UNCONFIGURED <noreply@example.invalid>'}\nInstalled-Size: {sum(len(d) for _, d, _, _ in debfiles) // 1024 + 1}\nDescription: image thumbnail listing in Kitty-compatible terminals\n Standalone Rust executable; lsi and lli commands.\n"
+    control = f"Package: lsi\nVersion: {version}\nSection: utils\nPriority: optional\nArchitecture: amd64\nMaintainer: {a.maintainer or 'UNCONFIGURED <noreply@example.invalid>'}\nInstalled-Size: {sum(len(d) for _, d, _, _ in debfiles) // 1024 + 1}\nDescription: image thumbnail listing in Kitty-compatible terminals\n Standalone Rust executable; use lsi -l for long listings.\n"
     if a.repository:
         control += f"Homepage: https://github.com/{a.repository}\n"
     deb = a.out / f"lsi_{version}_amd64.deb"

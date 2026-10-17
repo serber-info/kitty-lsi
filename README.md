@@ -43,8 +43,16 @@ not existing downloads or packages.
 Names must be checked before publication. `lsi-bin` will install the prebuilt
 binary; the source package will need a Rust build toolchain **at build time**.
 
-A binary release installs `lsi` plus an `lli -> lsi` symlink: two commands, one
-program. No shell-profile or `kitty.conf` changes are required.
+The standalone archive contains one executable, `lsi`, plus an `lli -> lsi`
+shortcut. AUR and Debian packages install only `lsi`, avoiding a conflict with
+LLVM's `/usr/bin/lli`. For the short command in Bash/Zsh, define:
+
+```sh
+alias lli='lsi -l'
+```
+
+Then `lli -h` is exactly `lsi -lh`. Add the alias to your own shell configuration
+if you want it to persist; installers never modify shell profiles or `kitty.conf`.
 
 Maintainer: **serber-info**. General support belongs in
 [GitHub Issues](https://github.com/serber-info/kitty-lsi/issues).

@@ -140,8 +140,7 @@ jobs:
           sed -i '/^[[:space:]]*NoExtract[[:space:]]*=/d' /etc/pacman.conf
           pacman -U --noconfirm ./lsi-bin-*.pkg.tar.zst
           lsi --version
-          lli -lh PKGBUILD
+          lsi -lh PKGBUILD
           pacman -Qkk lsi-bin
           pacman -R --noconfirm lsi-bin
           test ! -e /usr/bin/lsi
-          test ! -e /usr/bin/lli
