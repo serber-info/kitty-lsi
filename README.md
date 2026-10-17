@@ -18,6 +18,18 @@ The primary implementation is now **Rust**, in [`rust/`](rust/README.md).
 The original Python implementation and its 20 acceptance tests are preserved
 unchanged as a regression reference.
 
+## Visual examples
+
+Illustrative examples of grid and long-listing views:
+
+![lsi grid example](assets/lsi_demo.png)
+
+![lli long-listing example](assets/lli_demo.png)
+
+### Actual Kitty captures
+
+The following captures use generated test fixtures in a real Kitty window:
+
 ![Thumbnail grid in a real Kitty window](docs/images/grid.png)
 
 ![Long listing in a real Kitty window](docs/images/long.png)

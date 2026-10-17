@@ -9,5 +9,3 @@ dist/
 .ruff_cache/
 /rust/target/
 /artifacts/
-# Unverified, unused local mockups; public screenshots live in docs/images/.
-/assets/*_demo.png
