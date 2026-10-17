@@ -7,7 +7,9 @@ permissions:
   contents: read
 jobs:
   verify:
-    runs-on: ubuntu-24.04
+    # This VM permits unprivileged network namespaces without weakening AppArmor.
+    # Ubuntu 24.04 compatibility is still tested using its pinned clean rootfs.
+    runs-on: ubuntu-22.04
     env:
       RUSTUP_TOOLCHAIN: 1.98.0
     steps:
@@ -21,7 +23,9 @@ jobs:
         run: |
           mkdir "$RUNNER_TEMP/nasm"
           cd "$RUNNER_TEMP/nasm"
-          apt-get download nasm bubblewrap
+          apt-get download nasm
+          curl --fail --location --proto '=https' --tlsv1.2 https://deb.debian.org/debian/pool/main/b/bubblewrap/bubblewrap_0.8.0-2+deb12u1_amd64.deb -o bubblewrap.deb
+          echo '3cc9134a3286ad01a323dcd924ba123eb634cefaeec82d774257e06308aeaadb  bubblewrap.deb' | sha256sum -c -
           for package in ./*.deb; do dpkg-deb -x "$package" extracted; done
           echo "$RUNNER_TEMP/nasm/extracted/usr/bin" >> "$GITHUB_PATH"
       - run: rustup toolchain install 1.98.0 --profile minimal --component clippy,rustfmt --target x86_64-unknown-linux-musl
@@ -79,7 +83,7 @@ jobs:
           retention-days: 7
   deb-packages:
     needs: verify
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         distro: [ubuntu, debian]
@@ -99,7 +103,8 @@ jobs:
         run: |
           mkdir "$RUNNER_TEMP/bwrap"
           cd "$RUNNER_TEMP/bwrap"
-          apt-get download bubblewrap
+          curl --fail --location --proto '=https' --tlsv1.2 https://deb.debian.org/debian/pool/main/b/bubblewrap/bubblewrap_0.8.0-2+deb12u1_amd64.deb -o bubblewrap.deb
+          echo '3cc9134a3286ad01a323dcd924ba123eb634cefaeec82d774257e06308aeaadb  bubblewrap.deb' | sha256sum -c -
           dpkg-deb -x ./*.deb extracted
           echo "$RUNNER_TEMP/bwrap/extracted/usr/bin" >> "$GITHUB_PATH"
       - run: python tools/test_deb.py --distro '${{ matrix.distro }}' --package packages/lsi_*_amd64.deb --out "$RUNNER_TEMP/package-test"
