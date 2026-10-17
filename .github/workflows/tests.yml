@@ -44,7 +44,7 @@ jobs:
           "$RUNNER_TEMP/deny/bin/cargo-deny" --locked check
       - run: python -m pip install -r requirements-dev.txt
       - name: Rust compatibility in isolated processes
-        run: python -B -m unittest discover -s rust/tests -p test_compatibility.py -v
+        run: python -B -m unittest discover -s rust/tests -p 'test_*.py' -v
         env:
           LSI_BINARY: ${{ github.workspace }}/tools/isolate_binary.py
       - name: Isolated functional and adversarial CLI checks

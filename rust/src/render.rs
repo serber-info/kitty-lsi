@@ -2,6 +2,7 @@ use crate::{
     graphics,
     listing::{self, Accounts},
     options::Options,
+    pager::Pager,
     preview,
     scan::{Entry, is_image},
     terminal, text,
@@ -15,19 +16,32 @@ struct Card {
     id: Option<u32>,
     dimensions: String,
 }
+fn centered_label(value: &str, width: usize) -> String {
+    let label = text::truncate(value, width);
+    let padding = width.saturating_sub(text::width(&label));
+    let left = padding / 2;
+    format!(
+        "{}{}{}",
+        " ".repeat(left),
+        label,
+        " ".repeat(padding - left)
+    )
+}
 pub struct Renderer<'a, W: Write> {
     opt: &'a Options,
     out: W,
     accounts: Accounts,
     graphics: bool,
+    cache: Option<crate::cache::Cache>,
+    cache_initialized: bool,
     next_id: u32,
     pub errors: crate::errors::Errors,
     section_index: usize,
-    started: std::time::Instant,
+    budget: &'a crate::budget::Budget,
     used_ids: std::collections::HashSet<u32>,
 }
 impl<'a, W: Write> Renderer<'a, W> {
-    pub fn new(opt: &'a Options, out: W) -> Self {
+    pub fn new(opt: &'a Options, out: W, budget: &'a crate::budget::Budget) -> Self {
         let graphics = !opt.no_images && terminal::available();
         let mut bytes = [0; 4];
         let random = getrandom::fill(&mut bytes);
@@ -43,21 +57,28 @@ impl<'a, W: Write> Renderer<'a, W> {
             out,
             accounts: Accounts::new(),
             graphics: graphics && random.is_ok(),
+            cache: None,
+            cache_initialized: false,
             next_id: u32::from_ne_bytes(bytes) & 0xFFFFFF,
             errors,
             section_index: 0,
-            started: std::time::Instant::now(),
+            budget,
             used_ids: std::collections::HashSet::new(),
         }
     }
     fn image(&mut self, card: &mut Card, width: usize, height: usize) -> io::Result<()> {
-        if self.started.elapsed().as_secs() >= 120 {
-            return Err(io::Error::other("listing exceeded 120 second deadline"));
-        }
+        self.budget.check()?;
         let kind = card.entry.info.file_type();
         let raster = kind.is_file() && is_image(&card.entry.path);
+        if raster && !self.cache_initialized {
+            self.cache_initialized = true;
+            if !self.opt.no_cache {
+                self.cache = crate::cache::Cache::open().ok();
+            }
+            self.budget.check()?;
+        }
         let result = if raster {
-            crate::worker::load(&card.entry, width, height)
+            crate::worker::load(&card.entry, width, height, self.cache.as_ref())
         } else {
             let icon = if kind.is_symlink() {
                 preview::Icon::Link
@@ -155,8 +176,10 @@ impl<'a, W: Write> Renderer<'a, W> {
         let (columns, lines) = terminal::size().unwrap_or((80, 24));
         let width = usize::from(self.opt.width).min(columns.saturating_sub(12));
         let height = usize::from(self.opt.height).min(lines.saturating_sub(2).max(2));
+        let pager = Pager::new(self.opt);
         if !self.graphics || columns < 24 || width < 4 {
-            for card in cards {
+            for (index, card) in cards.into_iter().enumerate() {
+                pager.before(index, &mut self.out, self.budget)?;
                 if card.fields.is_empty() {
                     writeln!(self.out, "{}", card.name)?;
                 } else {
@@ -164,9 +187,9 @@ impl<'a, W: Write> Renderer<'a, W> {
                 }
             }
         } else if self.opt.long || self.opt.one {
-            self.rows(&mut cards, width, height, columns)?;
+            self.rows(&mut cards, width, height, columns, &pager)?;
         } else {
-            self.grid(&mut cards, width, height, columns)?;
+            self.grid(&mut cards, width, height, columns, &pager)?;
         }
         self.out.flush()
     }
@@ -176,31 +199,53 @@ impl<'a, W: Write> Renderer<'a, W> {
         width: usize,
         height: usize,
         columns: usize,
+        pager: &Pager,
     ) -> io::Result<()> {
         let per_row = ((columns - 1) / (width + 3)).max(1);
-        for batch in cards.chunks_mut(per_row) {
-            for card in batch.iter_mut() {
-                self.image(card, width, height)?;
-            }
-            for row in 0..height {
-                let cells: Vec<_> = batch
+        let page_size = pager.size.unwrap_or(cards.len().max(1));
+        for (page_index, page) in cards.chunks_mut(page_size).enumerate() {
+            pager.before(page_index * page_size, &mut self.out, self.budget)?;
+            for batch in page.chunks_mut(per_row) {
+                for card in batch.iter_mut() {
+                    self.image(card, width, height)?;
+                }
+                for row in 0..height {
+                    let cells: Vec<_> = batch
+                        .iter()
+                        .map(|c| Self::image_row(c, row, width))
+                        .collect();
+                    writeln!(self.out, "{}", cells.join("   "))?;
+                }
+                if self.opt.inode && batch.iter().any(|c| c.entry.info.is_dir()) {
+                    let inodes: Vec<_> = batch
+                        .iter()
+                        .map(|c| {
+                            if c.entry.info.is_dir() {
+                                centered_label(c.fields.first().map_or("", |f| f.trim()), width)
+                            } else {
+                                " ".repeat(width)
+                            }
+                        })
+                        .collect();
+                    writeln!(self.out, "{}", inodes.join("   "))?;
+                }
+                let labels: Vec<_> = batch
                     .iter()
-                    .map(|c| Self::image_row(c, row, width))
+                    .map(|c| {
+                        let label = if c.fields.is_empty() || c.entry.info.is_dir() {
+                            c.name.clone()
+                        } else {
+                            format!("{} {}", c.fields.join(" "), c.name)
+                        };
+                        if c.entry.info.is_dir() {
+                            centered_label(&label, width)
+                        } else {
+                            text::padded(&label, width)
+                        }
+                    })
                     .collect();
-                writeln!(self.out, "{}", cells.join("   "))?;
+                writeln!(self.out, "{}\n", labels.join("   "))?;
             }
-            let labels: Vec<_> = batch
-                .iter()
-                .map(|c| {
-                    let label = if c.fields.is_empty() {
-                        c.name.clone()
-                    } else {
-                        format!("{} {}", c.fields.join(" "), c.name)
-                    };
-                    text::padded(&label, width)
-                })
-                .collect();
-            writeln!(self.out, "{}\n", labels.join("   "))?;
         }
         Ok(())
     }
@@ -210,9 +255,11 @@ impl<'a, W: Write> Renderer<'a, W> {
         width: usize,
         height: usize,
         columns: usize,
+        pager: &Pager,
     ) -> io::Result<()> {
         let text_width = columns - width - 3;
-        for card in cards {
+        for (index, card) in cards.iter_mut().enumerate() {
+            pager.before(index, &mut self.out, self.budget)?;
             self.image(card, width, height)?;
             let mut labels = vec![card.name.clone()];
             if !card.fields.is_empty() {

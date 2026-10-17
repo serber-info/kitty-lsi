@@ -1,6 +1,48 @@
 use clap::{ArgAction, Parser, ValueEnum};
 use std::path::PathBuf;
 
+fn diagnostic(error: &mut clap::Error) -> String {
+    use clap::error::{ContextKind, ContextValue};
+    // Sanitize argument-bearing fields before formatting. Usage is generated
+    // from our static command definition, so its layout is trusted.
+    let context: Vec<_> = error
+        .context()
+        .filter(|(kind, _)| *kind != ContextKind::Usage)
+        .map(|(kind, value)| {
+            let safe = match value {
+                ContextValue::String(s) => ContextValue::String(crate::text::safe(s)),
+                ContextValue::Strings(values) => {
+                    ContextValue::Strings(values.iter().map(|s| crate::text::safe(s)).collect())
+                }
+                ContextValue::StyledStr(s) => {
+                    ContextValue::StyledStr(crate::text::safe(&s.to_string()).into())
+                }
+                ContextValue::StyledStrs(values) => ContextValue::StyledStrs(
+                    values
+                        .iter()
+                        .map(|s| crate::text::safe(&s.to_string()).into())
+                        .collect(),
+                ),
+                ContextValue::None | ContextValue::Bool(_) | ContextValue::Number(_) => {
+                    value.clone()
+                }
+                _ => ContextValue::String(crate::text::safe(&value.to_string())),
+            };
+            (kind, safe)
+        })
+        .collect();
+    for (kind, value) in context {
+        error.insert(kind, value);
+    }
+    // Keep formatter line breaks, not control characters or ANSI sequences.
+    error
+        .to_string()
+        .split('\n')
+        .map(crate::text::safe)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 #[derive(Debug, Clone, Copy, Default, ValueEnum)]
 pub enum Sort {
     #[default]
@@ -21,6 +63,13 @@ pub struct Options {
     pub help: Option<bool>,
     #[arg(short = 'l', help = "Long listing with metadata")]
     pub long: bool,
+    #[arg(
+        short = 's',
+        help = "Show 5 entries at a time; press ENTER to continue"
+    )]
+    pub step_default: bool,
+    #[arg(long, require_equals = true, value_name = "N", value_parser = clap::value_parser!(u8).range(5..=50), help = "Show N entries at a time (5-50); use --step=N")]
+    pub step: Option<u8>,
     #[arg(short = '1', help = "One thumbnail per row")]
     pub one: bool,
     #[arg(short = 'h', long, help = "Human-readable base-1024 sizes with -l")]
@@ -91,20 +140,22 @@ pub struct Options {
         help = "List subdirectories without following links"
     )]
     pub recursive: bool,
-    #[arg(long, default_value_t=14, value_parser=clap::value_parser!(u16).range(4..=60), help="Thumbnail columns")]
+    #[arg(long, default_value_t=14, value_parser=clap::value_parser!(u16).range(4..=60), help="Thumbnail columns (4-60)")]
     pub width: u16,
-    #[arg(long, default_value_t=5, value_parser=clap::value_parser!(u16).range(2..=16), help="Thumbnail rows")]
+    #[arg(long, default_value_t=5, value_parser=clap::value_parser!(u16).range(2..=16), help="Thumbnail rows (2-16)")]
     pub height: u16,
     #[arg(long, help = "Plain text, without graphics")]
     pub no_images: bool,
+    #[arg(long, help = "Disable reading and writing the thumbnail cache")]
+    pub no_cache: bool,
     pub paths: Vec<PathBuf>,
 }
 impl Options {
     pub fn read() -> Self {
-        let mut result = Self::try_parse().unwrap_or_else(|e| {
+        let mut result = Self::try_parse().unwrap_or_else(|mut e| {
             let code = e.exit_code();
             if e.use_stderr() {
-                eprintln!("{}", crate::text::safe(&e.to_string()));
+                eprint!("{}", diagnostic(&mut e));
             } else {
                 // Only static help/version output is allowed to contain newlines.
                 print!("{e}");
@@ -139,6 +190,12 @@ impl Options {
         } else {
             Sort::Name
         })
+    }
+
+    pub fn page_size(&self) -> Option<usize> {
+        self.step
+            .map(usize::from)
+            .or_else(|| self.step_default.then_some(5))
     }
 
     pub fn directories_first(&self) -> bool {

@@ -22,6 +22,10 @@ Example of the grid view:
 
 ![lsi grid example](assets/lsi_demo.png)
 
+Example of the long view (`lsi -l`):
+
+![lsi -l long listing example](assets/lli_demo.png)
+
 ## Run the local standalone binary
 
 ```sh
@@ -34,12 +38,12 @@ no Python, pip, Cargo, ImageMagick, `icat`, or system image-codec libraries at
 runtime. Kitty itself is needed to **display** the images. Outside Kitty and
 when piped/redirected, the program prints plain text.
 
-**No binary release has been published yet.** The source repository is
-[serber-info/kitty-lsi](https://github.com/serber-info/kitty-lsi).
-GitHub Releases and AUR `lsi-bin` / `lsi` are the planned distribution channels,
-not existing downloads or packages.
-Names must be checked before publication. `lsi-bin` will install the prebuilt
-binary; the source package will need a Rust build toolchain **at build time**.
+Prebuilt Linux binaries and `.deb` packages are available from
+[GitHub Releases](https://github.com/serber-info/kitty-lsi/releases).
+On Arch Linux and derivatives, install the prebuilt package from
+[AUR](https://aur.archlinux.org/packages/lsi-bin): `paru -S lsi-bin`.
+The AUR source package `lsi` is not currently published. Downloadable `.deb`
+files are not a signed APT repository or an official Debian/Ubuntu archive.
 
 The standalone archive contains one executable, `lsi`, plus an `lli -> lsi`
 shortcut. AUR and Debian packages install only `lsi`, avoiding a conflict with
@@ -64,6 +68,9 @@ private vulnerability reporting.
 lsi                         # Grid in the current directory
 lsi ~/Pictures              # Another directory
 lsi -l                      # Thumbnail rows + file metadata
+lsi -s                      # Grid in steps of 5 entries
+lsi -ls                     # Long listing in steps of 5 entries
+lsi -l --step=25            # Long listing in steps of 25 entries
 lli -h                      # Exactly lsi -lh
 lsi -lah                    # Long format, hidden files, readable sizes
 lsi -A                      # Hidden files, without . and ..
@@ -77,6 +84,55 @@ lsi -R --group-directories-first
 lsi --no-images
 lsi --help
 ```
+
+`--width` accepts 4-60 terminal columns and `--height` accepts 2-16 rows.
+Negative and out-of-range values are rejected. `--` ends option parsing;
+anything after it is treated as a path, including strings beginning with `-`.
+
+### Optional paging
+
+Use `-s` for steps of 5 entries, or `--step=N` for a size from 5 to 50.
+This works in grid and long modes; an explicit `--step=N` takes precedence
+over `-s`. The long option requires `=` and a value (`--step=25`, not `--step`).
+Paging is never automatic and never adds artificial delays.
+
+After each step, `Press ENTER to continue...` appears only if more entries
+remain in that directory. Directories and files both count as entries, and
+the next step's images are not decoded until you continue. A shorter listing
+finishes normally, without a prompt. Press Ctrl+C to stop, or Ctrl+D at an
+empty prompt to end the listing. Each directory starts a new step sequence.
+Paging requires terminal input and output; pipes and redirections never wait.
+User wait time is excluded from the processing deadline. Previous previews
+remain in terminal scrollback, so paging is not a cap on Kitty's memory usage.
+
+### Thumbnail cache
+
+The cache is enabled by default under `${XDG_CACHE_HOME:-$HOME/.cache}/kitty-lsi`.
+The first visit still decodes originals; later visits reuse thumbnails for
+unchanged files. Use `--no-cache` to disable both cache reads and writes.
+Only reencoded previews and their dimensions are stored, not copies of the
+original files. Cache hits still validate and reencode the small PNG inside
+the limited decoder worker, so they avoid full-size decoding, not all CPU work.
+
+The directory is private (0700), files are private (0600), and managed entries
+are capped at 256 MiB and 4,096 files, evicting the oldest entries first.
+Cache keys include the file identity, size, modification/change timestamps,
+thumbnail geometry and application version. Cached PNGs are decoded and
+reencoded in the same limited worker, never sent unchecked to the terminal.
+An unsafe, unavailable or busy cache falls back to normal uncached rendering.
+Corrupt candidate entries still count towards the budgets; if they prevent
+safe eviction, `lsi` displays images without adding more cache files.
+No extra dependencies or helper programs are required.
+
+Thumbnails can remain after originals are deleted. `--no-cache` does not delete
+existing entries, and previously cached pixels can remain after access to an
+original is revoked. Treat the cache as private image data, not anonymous metadata.
+
+To clear it, close running `lsi` processes and remove only the `kitty-lsi`
+subdirectory under your active cache location, **not the entire `~/.cache`
+directory**. The next image preview recreates it when caching is enabled.
+Never point another program's data at this directory. Cache directories with
+symlink components or unsafe ownership/permissions are not used.
 
 ### Supported `ls`-style flags
 
@@ -117,9 +173,10 @@ help. Unknown options fail explicitly. This is not a complete GNU `ls` clone.
   never interpreted XML. Symlink icons never follow their target. Unreadable
   images show a warning icon while retaining their error status and stderr
   diagnostic. No textual `[file]`/`[link]`/`[unreadable]` placeholders appear.
-- Originals are never modified. No network access, external rendering tools,
-  telemetry, persistent cache or temporary image files at runtime. Decoding uses
-  a resource-limited child invocation of this same executable.
+- Originals are never modified. No network access, external rendering tools or
+  telemetry. The private thumbnail cache uses atomic temporary writes within
+  its own directory. Decoding uses a resource-limited child invocation of this
+  same executable, including for cache hits.
 - Previews are limited to 64 MiB per source and 40 megapixels. Corrupt or
   oversized images remain listed, report errors and do not stop other files.
 - Symlinks and special files are not decoded. Symlink directories and symlink

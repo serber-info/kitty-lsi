@@ -278,12 +278,36 @@ pub fn entry() -> bool {
     }
     true
 }
-pub fn load(entry: &Entry, columns: usize, rows: usize) -> Result<Preview, String> {
+pub fn load(
+    entry: &Entry,
+    columns: usize,
+    rows: usize,
+    cache: Option<&crate::cache::Cache>,
+) -> Result<Preview, String> {
     let input =
         secure_fs::image(&entry.parent, &entry.leaf, &entry.info).map_err(|e| e.to_string())?;
     if input.metadata().map_err(|e| e.to_string())?.len() > 64 * 1024 * 1024 {
         return Err("file larger than 64 MiB".into());
     }
+    if let Some(cache) = cache
+        && let Ok((cached, dimensions)) = cache.get(entry, columns, rows)
+        && let Ok(mut preview) = decode(cached, columns, rows)
+    {
+        secure_fs::identity(&entry.info, &input.metadata().map_err(|e| e.to_string())?)
+            .map_err(|e| e.to_string())?;
+        preview.dimensions = dimensions;
+        return Ok(preview);
+    }
+    let preview = decode(input.try_clone().map_err(|e| e.to_string())?, columns, rows)?;
+    secure_fs::identity(&entry.info, &input.metadata().map_err(|e| e.to_string())?)
+        .map_err(|e| e.to_string())?;
+    if let Some(cache) = cache {
+        // Cache failures must never prevent a real image from being displayed.
+        let _ = cache.store(entry, columns, rows, &preview);
+    }
+    Ok(preview)
+}
+fn decode(input: File, columns: usize, rows: usize) -> Result<Preview, String> {
     let mut child = Command::new("/proc/self/exe")
         .args([
             "--internal-preview-worker",

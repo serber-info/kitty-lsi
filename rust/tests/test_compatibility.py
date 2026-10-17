@@ -16,6 +16,99 @@ class RustCommandTests(CommandTests):
                               capture_output=True, text=True, timeout=20,
                               env={**os.environ, "LC_ALL": "C", "TZ": "UTC"})
 
+    def test_grid_centers_only_directory_labels(self):
+        names = {"git": 3, "Música": 6, "照片": 4, "e\u0301": 1}
+        for name in names:
+            (self.root / name).mkdir()
+        for width in (14, 15, 20):
+            for name, cells in names.items():
+                with self.subTest(width=width, name=name):
+                    code, raw, plain, errors = self.terminal_command(
+                        "--width", str(width), "-d", name)
+                    self.assertEqual(code, 0, errors)
+                    self.assertIn("a=T,f=100", raw)
+                    padding = width - cells
+                    expected = " " * (padding // 2) + name + " " * (padding - padding // 2)
+                    self.assertIn(expected, plain.splitlines())
+
+        code, _, plain, errors = self.terminal_command("--width", "14", "-dF", "git")
+        self.assertEqual(code, 0, errors)
+        self.assertIn("     git/     ", plain.splitlines())
+
+        # Long names still truncate to the same cell width.
+        (self.root / "abcdefghijklmnop").mkdir()
+        code, _, plain, errors = self.terminal_command("-d", "abcdefghijklmnop")
+        self.assertEqual(code, 0, errors)
+        self.assertIn("abcdefghijklm…", plain.splitlines())
+
+    def test_centering_does_not_change_files_links_rows_or_plain_output(self):
+        from PIL import Image
+        (self.root / "git").mkdir()
+        (self.root / "link").symlink_to("git", target_is_directory=True)
+        Image.new("RGB", (10, 10)).save(self.root / "a.png")
+        for name in ("small.txt", "a.png", "link"):
+            code, _, plain, errors = self.terminal_command("-d", name)
+            self.assertEqual(code, 0, errors)
+            self.assertIn(name.ljust(14), plain.splitlines())
+        code, _, plain, errors = self.terminal_command("-d", "git", "small.txt", columns=40)
+        self.assertEqual(code, 0, errors)
+        self.assertIn("     git      " + "   " + "small.txt     ", plain.splitlines())
+        code, _, plain, errors = self.terminal_command("-d", "git", columns=12)
+        self.assertEqual(code, 0, errors)
+        self.assertEqual(plain.splitlines(), ["git"])
+        for flag in ("-l", "-1"):
+            code, _, plain, errors = self.terminal_command("-d", flag, "git")
+            self.assertEqual(code, 0, errors)
+            self.assertIn("▧" * 14 + "  git", plain.splitlines())
+        for args in (("-d", "git"), ("--no-images", "-d", "git")):
+            self.assertEqual(self.command(*args).stdout, "git\n")
+
+    def test_grid_directory_inode_is_above_the_centered_name(self):
+        names = {"Mi_carpeta": 10, "Música": 6, "照片": 4}
+        for name in names:
+            (self.root / name).mkdir()
+        for width in (14, 20):
+            for name, cells in names.items():
+                with self.subTest(width=width, name=name):
+                    inode = str((self.root / name).stat().st_ino)
+                    code, _, plain, errors = self.terminal_command(
+                        "-id", "--width", str(width), name)
+                    self.assertEqual(code, 0, errors)
+                    padding = width - cells
+                    expected = " " * (padding // 2) + name + " " * (padding - padding // 2)
+                    lines = plain.splitlines()
+                    index = lines.index(expected)
+                    self.assertEqual(lines[index - 1], inode.center(width))
+                    self.assertEqual(len(lines), 8)  # Image, inode, name, blank.
+        name = "abcdefghijklmnop"
+        (self.root / name).mkdir()
+        code, _, plain, errors = self.terminal_command("-id", name)
+        self.assertEqual(code, 0, errors)
+        self.assertIn("abcdefghijklm…", plain.splitlines())
+
+    def test_grid_inode_mixed_row_preserves_file_and_other_modes(self):
+        (self.root / "git").mkdir()
+        inode = str((self.root / "git").stat().st_ino)
+        file_inode = str((self.root / "small.txt").stat().st_ino)
+        label = file_inode + " small.txt"
+        file_label = (label[:13] + "…") if len(label) > 14 else label.ljust(14)
+        code, _, plain, errors = self.terminal_command(
+            "-id", "git", "small.txt", columns=40)
+        self.assertEqual(code, 0, errors)
+        lines = plain.splitlines()
+        self.assertEqual(lines[5], inode.center(14) + "   " + " " * 14)
+        self.assertEqual(lines[6], "     git      " + "   " + file_label)
+        code, _, plain, errors = self.terminal_command("-id", "small.txt")
+        self.assertEqual(code, 0, errors)
+        self.assertEqual(len(plain.splitlines()), 7)  # Files keep a single label.
+        self.assertIn(file_label, plain.splitlines())
+        for args in (("-id", "git"), ("--no-images", "-id", "git")):
+            self.assertEqual(self.command(*args).stdout, inode + " git\n")
+        code, _, plain, errors = self.terminal_command("-lid", "git")
+        self.assertEqual(code, 0, errors)
+        self.assertIn("▧" * 14 + "  git", plain.splitlines())
+        self.assertTrue(any(inode in line and "drwx" in line for line in plain.splitlines()))
+
 
 
 

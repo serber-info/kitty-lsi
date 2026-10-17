@@ -1,7 +1,10 @@
+mod budget;
+mod cache;
 mod errors;
 mod graphics;
 mod listing;
 mod options;
+mod pager;
 mod preview;
 mod render;
 mod scan;
@@ -17,12 +20,14 @@ fn run() -> io::Result<i32> {
     worker::limit(libc::RLIMIT_AS, 1024 * 1024 * 1024)?;
     worker::limit(libc::RLIMIT_CPU, 60)?;
     let output = io::stdout();
-    let mut renderer = render::Renderer::new(&options, output.lock());
+    let budget = budget::Budget::new();
+    let mut renderer = render::Renderer::new(&options, output.lock(), &budget);
     let mut errors = errors::Errors::new();
     scan::walk(
         &options,
         |heading, entries| renderer.section(heading, entries),
         &mut errors,
+        &budget,
     )?;
     errors.append(&mut renderer.errors);
     for error in errors.iter() {

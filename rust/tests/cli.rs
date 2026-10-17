@@ -71,6 +71,46 @@ fn invalid_inputs_are_errors_not_panics() {
     }
     assert_eq!(f.run(&["missing"]).status.code(), Some(1));
 }
+
+#[test]
+fn step_options_validate_the_size_not_the_number_of_entries() {
+    let f = Fixture::new();
+    fs::write(f.0.join("one.txt"), b"one").unwrap();
+    for args in [
+        &["-ls"][..],
+        &["-s"],
+        &["--step=5"],
+        &["-l", "--step=25"],
+        &["-l", "--step=50"],
+        &["-ls", "--step=25"],
+    ] {
+        let output = f.run(args);
+        assert!(
+            output.status.success(),
+            "{args:?}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(String::from_utf8_lossy(&output.stdout).contains("one.txt"));
+        assert!(!String::from_utf8_lossy(&output.stdout).contains("Press ENTER"));
+    }
+    for args in [
+        &["-l", "--step"][..],
+        &["-l", "--step="],
+        &["-l", "--step=culo"],
+        &["-l", "--step=1"],
+        &["-l", "--step=4"],
+        &["-l", "--step=51"],
+        &["-l", "--step=999999999999999999999"],
+        &["-l", "--step", "25"],
+        &["-lstep=1"],
+    ] {
+        let output = f.run(args);
+        assert_eq!(output.status.code(), Some(2), "{args:?}");
+        assert!(!output.stderr.is_empty());
+        assert!(!String::from_utf8_lossy(&output.stderr).contains("panicked"));
+        assert!(output.stdout.is_empty());
+    }
+}
 #[test]
 fn filenames_cannot_send_terminal_commands() {
     let f = Fixture::new();
@@ -163,7 +203,39 @@ fn argument_diagnostics_cannot_inject_terminal_controls() {
     assert_eq!(output.status.code(), Some(2));
     assert!(!output.stderr.contains(&0x1b));
     assert!(!output.stderr.contains(&7));
-    assert_eq!(output.stderr.iter().filter(|&&b| b == b'\n').count(), 1);
+    let message = String::from_utf8_lossy(&output.stderr);
+    assert!(!message.contains("\nforged-error"));
+    assert!(message.contains("secret??forged-error"));
+    for args in [
+        &["--bad\x1b]52;c;secret\x07\nforged-error"][..],
+        &["--width", "200\nforged-error\x1b[2J"],
+        &["--step=25\nforged-error\x1b[2J"],
+    ] {
+        let output = f.run(args);
+        let message = String::from_utf8_lossy(&output.stderr);
+        assert_eq!(output.status.code(), Some(2));
+        assert!(!output.stderr.contains(&0x1b));
+        assert!(!output.stderr.contains(&7));
+        assert!(!message.contains("\nforged-error"), "{message}");
+    }
+}
+
+#[test]
+fn geometry_errors_keep_readable_layout_and_reject_invalid_values() {
+    let f = Fixture::new();
+    for args in [
+        &["--width", "200", "--height", "50"][..],
+        &["--width", "-2", "--height", "-8"],
+        &["--width=-2", "--height=-8"],
+    ] {
+        let output = f.run(args);
+        let message = String::from_utf8_lossy(&output.stderr);
+        assert_eq!(output.status.code(), Some(2));
+        assert!(!message.contains("??"), "{message}");
+        assert!(message.contains("\n\n"), "{message}");
+        assert!(message.contains("For more information, try '--help'."));
+        assert!(!output.stderr.contains(&0x1b));
+    }
 }
 
 #[test]

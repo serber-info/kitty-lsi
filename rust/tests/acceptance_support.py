@@ -173,7 +173,7 @@ class CommandTests(unittest.TestCase):
 
     def test_help_and_version(self):
         self.assertIn("--human-readable", self.command("--help").stdout)
-        self.assertEqual(self.command("--version").stdout, "kitty-lsi 0.1.0\n")
+        self.assertEqual(self.command("--version").stdout, "kitty-lsi 0.2.0\n")
 
     def test_no_images_and_redirected_output_do_not_decode_corrupt_files(self):
         (self.root / "bad.png").write_bytes(b"bad PNG")

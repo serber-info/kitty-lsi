@@ -37,7 +37,7 @@ generates and inspects developer-only fixtures; no alternative application is sh
 # From the repository root, using the existing development venv:
 LSI_REAL_BINARY="$PWD/rust/target/x86_64-unknown-linux-musl/release/lsi" \
 LSI_BINARY="$PWD/tools/isolate_binary.py" \
-  .venv/bin/python -m unittest discover -s rust/tests -p test_compatibility.py -v
+  .venv/bin/python -m unittest discover -s rust/tests -p 'test_*.py' -v
 ```
 
 The compatibility suite retains original flag/CLI/PTy scenarios, with explicit
@@ -89,6 +89,8 @@ script completion alone is not a visual pass.
 - `preview.rs`: bounded raster decoding, orientation and PNG encoding.
 - `graphics.rs`: Kitty chunking, virtual placements and Unicode placeholders.
 - `text.rs`, `terminal.rs`: safe cell-aware text, terminal capability and ioctl.
+- `cache.rs`: private descriptor-anchored, bounded thumbnail storage.
+- `pager.rs`, `budget.rs`: opt-in steps and processing time excluding user waits.
 
 The stable test seam is the executable interface; module internals may change.
 
@@ -102,7 +104,7 @@ previews. See [security policy](../SECURITY.md) for budgets and residual risks.
 
 ```sh
 python tools/security_tests.py --binary rust/target/x86_64-unknown-linux-musl/release/lsi
-LSI_BINARY="$PWD/tools/isolate_binary.py" .venv/bin/python -B -m unittest discover -s rust/tests -p test_compatibility.py -v
+LSI_BINARY="$PWD/tools/isolate_binary.py" .venv/bin/python -B -m unittest discover -s rust/tests -p 'test_*.py' -v
 python tools/build_release.py --binary rust/target/x86_64-unknown-linux-musl/release/lsi --out /tmp/lsi-candidate-NEW
 ```
 

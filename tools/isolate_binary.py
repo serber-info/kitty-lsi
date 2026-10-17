@@ -78,7 +78,14 @@ cmd = [
     "UTC",
     "--chdir",
     "/images",
-    "/lli" if pathlib.Path(sys.argv[0]).name == "lli" else "/lsi",
-    *args,
 ]
+# Cache regressions opt into one explicit writable temporary directory. Nothing
+# else from the host's HOME/cache is exposed to the sandbox.
+cache = os.environ.get("LSI_TEST_CACHE_DIR")
+if cache:
+    cache = pathlib.Path(cache).resolve(strict=True)
+    if not cache.is_dir() or cache.stat().st_uid != os.getuid():
+        raise SystemExit("cache test directory must be owned by the test user")
+    cmd.extend(["--bind", str(cache), "/cache", "--setenv", "XDG_CACHE_HOME", "/cache"])
+cmd.extend(["/lli" if pathlib.Path(sys.argv[0]).name == "lli" else "/lsi", *args])
 os.execv(cmd[0], cmd)

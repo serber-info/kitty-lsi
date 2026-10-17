@@ -138,12 +138,12 @@ pub fn walk(
     opt: &Options,
     mut show: impl FnMut(Option<String>, Vec<Entry>) -> io::Result<()>,
     errors: &mut Errors,
+    budget: &crate::budget::Budget,
 ) -> io::Result<()> {
     if opt.paths.len() > MAX_ENTRIES {
         return Err(io::Error::other("operand limit exceeded (20000)"));
     }
     let mut total = 0usize;
-    let started = std::time::Instant::now();
     let (mut files, mut folders) = (Vec::new(), Vec::new());
     let mut parents = HashMap::new();
     for path in &opt.paths {
@@ -168,9 +168,7 @@ pub fn walk(
     }
     let mut seen = HashSet::new();
     while let Some(entry) = stack.pop() {
-        if started.elapsed().as_secs() >= 120 {
-            return Err(io::Error::other("listing exceeded 120 second deadline"));
-        }
+        budget.check()?;
         let depth = entry.depth;
         let folder = entry.path;
         let directory = match secure_fs::directory(&entry.parent, &entry.leaf, &entry.info) {
@@ -198,9 +196,7 @@ pub fn walk(
             };
         let mut entries = Vec::new();
         for child in children {
-            if started.elapsed().as_secs() >= 120 {
-                return Err(io::Error::other("listing exceeded 120 second deadline"));
-            }
+            budget.check()?;
             match child {
                 Ok(child) => {
                     let name = child.file_name().to_string_lossy().into_owned();
