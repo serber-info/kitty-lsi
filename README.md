@@ -14,9 +14,7 @@ order with directories and files mixed. `--group-directories-first` explicitly
 keeps grouping with a selected sort; `-U` / `--sort=none` preserve enumeration order
 unless grouping is explicitly requested.
 
-The primary implementation is now **Rust**, in [`rust/`](rust/README.md).
-The original Python implementation and its 20 acceptance tests are preserved
-unchanged as a regression reference.
+The implementation is **Rust**, in [`rust/`](rust/README.md).
 
 ## Visual examples
 

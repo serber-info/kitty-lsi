@@ -1,6 +1,6 @@
 # Rust implementation
 
-Independent of the preserved Python source. The executable does not import,
+The executable does not import,
 invoke, embed or require Python, `icat`, ImageMagick or other codec programs.
 
 ## Build prerequisites (developers only)
@@ -30,18 +30,14 @@ A normal GNU debug build is not the distributed standalone artifact.
 ## Regression testing
 
 Native Cargo integration tests exercise the command interface without Python.
-The preserved Python acceptance specification also runs against Rust via a
-process/PTY adapter; only explicitly newer Rust behaviour has overrides. No Rust
-internals or command output are mocked/rewritten. Pillow only generates and
-inspects test fixtures. Original Python source and tests remain unchanged.
+Acceptance tests run directly against the Rust process/PTY interface. Pillow
+generates and inspects developer-only fixtures; no alternative application is shipped.
 
 ```sh
 # From the repository root, using the existing development venv:
 LSI_REAL_BINARY="$PWD/rust/target/x86_64-unknown-linux-musl/release/lsi" \
 LSI_BINARY="$PWD/tools/isolate_binary.py" \
   .venv/bin/python -m unittest discover -s rust/tests -p test_compatibility.py -v
-.venv/bin/python -m unittest discover -s tests -v
-sha256sum -c docs/python-baseline.sha256
 ```
 
 The compatibility suite retains original flag/CLI/PTy scenarios, with explicit

@@ -5,8 +5,7 @@ Do not replace `ls`, modify shell profiles, or require Kitty remote control for
 normal use. Preserve plain-output fallback and never modify source images.
 
 The primary implementation is in `rust/`; see [its instructions](rust/README.md).
-The original Python code and tests are retained as a regression reference.
-Do not remove or silently rewrite that baseline during the migration.
+Python scripts are development-only QA and packaging tools, never application runtime.
 
 ## Design and tests
 
@@ -38,7 +37,7 @@ See `SECURITY.md`. Prefer
 `sh tools/build_static.sh` for a private-path-remapped static release. Use
 `tools/security_tests.py` only with effective unprivileged namespaces and the
 verified resource limits; it retains all results. `tools/isolate_binary.py`
-adapts the public CLI acceptance seam to bwrap without changing Python tests.
+runs the Rust CLI acceptance seam inside bwrap.
 
 `tools/build_release.py` creates deterministic candidates and collects actual
 license texts plus exact MPL source. `--release` rejects incomplete contact,

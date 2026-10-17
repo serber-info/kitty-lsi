@@ -1,0 +1,2 @@
+# Development-only image fixtures; not an lsi runtime dependency.
+Pillow==12.3.0

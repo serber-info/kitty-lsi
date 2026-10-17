@@ -42,16 +42,13 @@ jobs:
           cargo +1.98.0 install cargo-deny --version 0.20.2 --locked --root "$RUNNER_TEMP/deny"
           "$RUNNER_TEMP/audit/bin/cargo-audit" audit
           "$RUNNER_TEMP/deny/bin/cargo-deny" --locked check
-      - run: python -m pip install -e .
-      - run: python -B -m unittest discover -s tests -v
+      - run: python -m pip install -r requirements-dev.txt
       - name: Rust compatibility in isolated processes
         run: python -B -m unittest discover -s rust/tests -p test_compatibility.py -v
         env:
           LSI_BINARY: ${{ github.workspace }}/tools/isolate_binary.py
       - name: Isolated functional and adversarial CLI checks
         run: python tools/security_tests.py --binary rust/target/x86_64-unknown-linux-musl/release/lsi --out "$RUNNER_TEMP/security-results"
-      - name: Verify Python reference unchanged
-        run: sha256sum -c docs/python-baseline.sha256
       - name: ELF gates (fail closed)
         run: |
           python -B -m unittest discover -s tools -p test_release.py -v
@@ -140,6 +137,7 @@ jobs:
           chown -R builder:builder "$RUNNER_TEMP/aur"
           cd "$RUNNER_TEMP/aur"
           su builder -c 'makepkg --printsrcinfo > .SRCINFO && makepkg --nodeps --nocheck --nosign'
+          sed -i '/^[[:space:]]*NoExtract[[:space:]]*=/d' /etc/pacman.conf
           pacman -U --noconfirm ./lsi-bin-*.pkg.tar.zst
           lsi --version
           lli -lh PKGBUILD

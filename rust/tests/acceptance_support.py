@@ -21,6 +21,10 @@ import unittest
 from PIL import Image
 
 
+ROOT = Path(__file__).resolve().parents[2]
+BINARY = Path(os.environ.get("LSI_BINARY", ROOT / "rust/target/debug/lsi")).resolve()
+
+
 class CommandTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -30,7 +34,7 @@ class CommandTests(unittest.TestCase):
 
     def command(self, *args):
         return subprocess.run(
-            [sys.executable, "-m", "kitty_lsi", *args], cwd=self.root,
+            [str(BINARY), *args], cwd=self.root,
             capture_output=True, text=True, timeout=10,
             env={**os.environ, "LC_ALL": "C", "TZ": "UTC"},
         )
@@ -42,7 +46,7 @@ class CommandTests(unittest.TestCase):
         env = {**os.environ, "TERM": "xterm-kitty", "KITTY_WINDOW_ID": "1"}
         env.pop("TMUX", None)
         env.pop("STY", None)
-        process = subprocess.Popen([sys.executable, "-m", "kitty_lsi", *args],
+        process = subprocess.Popen([str(BINARY), *args],
                                    cwd=self.root, env=env, stdin=subprocess.DEVNULL,
                                    stdout=slave, stderr=subprocess.PIPE)
         os.close(slave)
@@ -143,13 +147,13 @@ class CommandTests(unittest.TestCase):
         self.assertIn("-rw-", plain)
         self.assertFalse(any("alpha.png" in line and "beta.png" in line for line in plain.splitlines()))
 
-    def test_lli_is_the_long_listing_entrypoint(self):
-        result = subprocess.run(
-            [sys.executable, "-c", "from kitty_lsi.cli import lli_main; raise SystemExit(lli_main())", "-h"],
-            cwd=self.root, capture_output=True, text=True, timeout=10,
-        )
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertRegex(result.stdout, r"^-rw-.*1\.5K.*small.txt")
+
+
+
+
+
+
+
 
     def test_empty_missing_and_multiple_operands(self):
         (self.root / "empty").mkdir()
@@ -283,7 +287,3 @@ class CommandTests(unittest.TestCase):
         code, raw, plain, errors = self.terminal_command("pixels.png")
         self.assertEqual(code, 1)
         self.assertIn("40 megapixels", errors)
-
-
-if __name__ == "__main__":
-    unittest.main()

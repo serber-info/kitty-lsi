@@ -1,17 +1,11 @@
-"""Original acceptance specification against the independent Rust executable.
-
-The preserved Python tests are inherited unchanged except for explicitly newer
-Rust behaviour: directory grouping, neutral raster icons and lli as a symlink.
-Python/Pillow are fixture tools only, not application runtime dependencies.
-"""
+"""Acceptance tests of the Rust CLI; Python/Pillow are developer fixture tools only."""
 import os
 from pathlib import Path
 import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "tests"))
-from test_commands import CommandTests
+from acceptance_support import CommandTests
 
 BINARY = Path(os.environ.get("LSI_BINARY", ROOT / "rust/target/debug/lsi")).resolve()
 
@@ -22,16 +16,16 @@ class RustCommandTests(CommandTests):
                               capture_output=True, text=True, timeout=20,
                               env={**os.environ, "LC_ALL": "C", "TZ": "UTC"})
 
-    def terminal_command(self, *args, columns=80, rows=24):
-        # Adapt only the process seam; do not mock Rust internals or output.
-        original = subprocess.Popen
-        def launch(argv, **kwargs):
-            if argv[:3] == [sys.executable, "-m", "kitty_lsi"]:
-                argv = [str(BINARY), *argv[3:]]
-            return original(argv, **kwargs)
-        from unittest.mock import patch
-        with patch("subprocess.Popen", side_effect=launch):
-            return super().terminal_command(*args, columns=columns, rows=rows)
+
+
+
+
+
+
+
+
+
+
 
     def test_lli_is_the_long_listing_entrypoint(self):
         alias = self.root / "lli"
@@ -43,8 +37,6 @@ class RustCommandTests(CommandTests):
 
 
     def test_hidden_files_and_directory_traversal(self):
-        # The Python baseline remains untouched; directory grouping is a later,
-        # explicitly requested Rust behaviour change.
         (self.root / ".secret.png").touch()
         (self.root / "folder").mkdir()
         (self.root / "folder" / "nested.txt").touch()
